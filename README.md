@@ -13,5 +13,5 @@ cd build
 export PICO_SDK_PATH=../../pico-sdk
 make -j4
 ```
-Inside the build folder, there should the a src folder that contains all the binary executable, just load the executable to raspberry pi pico 
+Inside the build folder, there should be a src folder created that contains all the binary executable, just load the executable to raspberry pi pico 
 and you're good to go!
