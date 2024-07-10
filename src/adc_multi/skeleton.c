@@ -18,17 +18,21 @@
 #define Fs 50000.0 // Sample rate (Hz) (must not goes higer than 75 kSPS)
 #define ADCCLK 48000000.0 // ADC clock rate (unmutable!)
 
+#define MACHINES_EMPLOYED 3 // how many pi pico we are using
+
 // ---------------- preprocessor variable ----------------
 #define PRINT_BUFFER
 #define RECORD_TIME
 
-volatile bool lock;
 volatile uint16_t sample_buffer[SAMPLE_BUFFER_SIZE];
 volatile uint32_t timestamp[SAMPLE_BUFFER_SIZE];
 volatile uint16_t sample_index = 0;
 volatile bool sampling_done = false;
 
-unsigned short machine_enum = 1;
+// indicate the current machine, useful for debugging. CHANGE ACCORDINGLY
+unsigned short machine_state = 1; 
+// machine 1 starts off unlocked, the rest starts off locked. CHANGE ACCORDINGLY
+volatile bool lock = false; 
 
 // digital-to-voltage conversion
 const float conversion_factor = 3.3f / (1 << 12); 
@@ -103,9 +107,6 @@ void print_buffer(){
 }
 
 int main() {
-
-    lock = false;
-
     stdio_init_all(); // initialize stdio lib
     printf("Program started\n");
 
@@ -131,7 +132,7 @@ lableStall:
     // *************************************************
     // ------------- Stalling Stage Exited -------------
     // -------------------------------------------------
-    if (machine_enum <= 1) {
+    if (machine_state <= 1) {
         // set in-mode for receiver pin and pull it up for irq pending
         gpio_set_dir(RECEIVER_PIN, GPIO_IN);
         gpio_pull_up(RECEIVER_PIN);
@@ -177,7 +178,7 @@ lableStall:
         return 1;
     }    
     
-    machine_enum++;
+    machine_state += MACHINES_EMPLOYED;
     lock = true;
     sample_index = 0;
 
