@@ -1,9 +1,9 @@
 ## About
-This are some c codes I've been working with on raspberry pi pico, mainly on it's adc unit, and I will try more stuff in the future
+Theses are some c codes I've been working with on raspberry pi pico, mainly on it's adc unit, and I will try more stuff in the future
 
 ## Usage
-To use it, you need to configure your raspberry pi pico c/c++ sdk, following the guides on: [link](https://github.com/raspberrypi/pico-sdk), 
-as well as their excellent official pdf: [link](https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf).
+To use it, you need to configure your raspberry pi pico c/c++ sdk, following the guides on: [Pico c/c++ sdk](https://github.com/raspberrypi/pico-sdk), 
+as well as their excellent official pdf: [Getting Started with Pico](https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf).
 
 ## Build
 To build the repo:
