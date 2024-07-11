@@ -2,11 +2,16 @@
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 #include "hardware/timer.h"
+#include "hardware/uart.h"
 
 #define SENDER_PIN 4 // GPIO-4 - pin used to send flag signal for unstalling main
 #define RECEIVER_PIN 5 // GPIO-5 - pin used to receive flag signal for unstalling main
 
-// ADC unit config
+/*
+    ADC configs:
+        - set Analog channel
+        - set sampling rate
+*/
 #define ADC_PULSE_PIN 2 // GPIO-2 - pin pulled to receive pulse signal for ADC read
 #define ADC_PIN 26 // ADC0 aka GPIO-26, pin corresponding to adc unit
 #define ADC_CHANNEL 0 // ADC channels, pick from 0-3 (4 is reserved for temp. sensor)
@@ -20,15 +25,23 @@
 
 #define MACHINES_EMPLOYED 3 // how many pi pico we are using
 
-// ---------------- preprocessor variable ----------------
+// ---------------- Preprocessor variable ----------------
 #define PRINT_BUFFER
 #define RECORD_TIME
 
+// -------------------- UART Config ----------------------
+#define UART_ID uart0
+#define BAUD_RATE 115200
+#define UART_TX_PIN 0
+#define UART_RX_PIN 1
+
+// ------------------- Buffer Config ---------------------
 volatile uint16_t sample_buffer[SAMPLE_BUFFER_SIZE];
 volatile uint32_t timestamp[SAMPLE_BUFFER_SIZE];
 volatile uint16_t sample_index = 0;
 volatile bool sampling_done = false;
 
+// ------------ Adjust the following variable ------------
 // indicate the current machine, useful for debugging. CHANGE ACCORDINGLY
 unsigned short machine_state = 1; 
 // machine 1 starts off unlocked, the rest starts off locked. CHANGE ACCORDINGLY
@@ -84,8 +97,16 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
     }
 }
 
-int transfer_buffer(){
-    // TODO: implement buffer transferring
+void send_data_uart(volatile uint16_t* data) {
+    // Initialize UART
+    uart_init(UART_ID, BAUD_RATE); 
+    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART); // set GPIO0 as UART TX
+    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART); // set GPIO1 as UART RX
+
+    for (size_t i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        uart_putc_raw(UART_ID, data[i] & 0xFF);        // send lower byte
+        uart_putc_raw(UART_ID, (data[i] >> 8) & 0xFF); // send upper byte
+    }
 }
 
 int clear_buffer(){
@@ -117,11 +138,7 @@ int main() {
     gpio_init(SENDER_PIN);
     printf("Operating PIN's initialized\n");
 
-    /*
-        ADC configs:
-            - set Analog channel
-            - set sampling rate
-    */
+    // initialize ADC configurations
     adc_gpio_init(ADC_PIN);
     adc_select_input(ADC_CHANNEL);
     adc_set_clkdiv(ADCCLK/Fs); // adjust the sampling rate
@@ -132,6 +149,8 @@ labelStall:
     // *************************************************
     // ------------- Stalling Stage Exited -------------
     // -------------------------------------------------
+    
+    // let the first main skips the stalling stage
     if (machine_state <= 1) {
         // set in-mode for receiver pin and pull it up for irq pending
         gpio_set_dir(RECEIVER_PIN, GPIO_IN);
@@ -164,13 +183,8 @@ labelStall:
     // --------------- ADC Read Complete ---------------
     // *************************************************
 
-
-
-    // TODO: implement buffer transferring interface
-    if(transfer_buffer()){
-        printf("Error: Transferring failed");
-        return 1;
-    }
+    // buffer transfer using UART interface
+    send_data_uart(sample_buffer);
 
     // TODO: clear the BUFFER and reinitialize the counter
     if(clear_buffer()){
@@ -178,9 +192,9 @@ labelStall:
         return 1;
     }    
     
-    machine_state += MACHINES_EMPLOYED;
-    lock = true;
-    sample_index = 0;
+    machine_state += MACHINES_EMPLOYED; // increment the machine states for debug
+    lock = true;    // flag the lock status 
+    sample_index = 0; // reset the buffer counter
 
 goto labelStall;
 
