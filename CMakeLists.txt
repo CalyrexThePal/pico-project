@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.12)
 
 # Pull in SDK (must be before project)
-include(pico_sdk_import.cmake)
+include(.cm/pico_sdk_import.cmake)
 
-include(pico_extras_import_optional.cmake)
+include(.cm/pico_extras_import_optional.cmake)
 
 project(pico_examples C CXX ASM)
 set(CMAKE_C_STANDARD 11)
@@ -18,10 +18,10 @@ set(PICO_EXAMPLES_PATH ${PROJECT_SOURCE_DIR})
 # Initialize the SDK
 pico_sdk_init()
 
-include(example_auto_set_url.cmake)
+include(.cm/example_auto_set_url.cmake)
+
 # Add source code directory (store all the codes)
 add_subdirectory(src)
-
 
 add_compile_options(-Wall
         -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
@@ -30,4 +30,3 @@ add_compile_options(-Wall
 if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
     add_compile_options(-Wno-maybe-uninitialized)
 endif()
-
