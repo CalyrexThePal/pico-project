@@ -68,7 +68,7 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
         sample_index++;
 
         // check if the index exceeds certain threshold
-        if (sampel_index == BUFFER_THRESHOLD){
+        if (sample_index == BUFFER_THRESHOLD){
             // set out-mode for sender pin, and pull up for irq sending
             gpio_set_dir(SENDER_PIN, GPIO_OUT);
             gpio_pull_up(SENDER_PIN);
@@ -127,7 +127,7 @@ int main() {
     adc_set_clkdiv(ADCCLK/Fs); // adjust the sampling rate
     printf("ADC initialized\n");
 
-lableStall:
+labelStall:
 
     // *************************************************
     // ------------- Stalling Stage Exited -------------
