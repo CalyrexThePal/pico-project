@@ -29,8 +29,8 @@
 // #define PRINT_BUFFER_TEST
 // #define RECORD_TIME
 
-// choose the transfer interface you're using
-#define USB_TR
+// IMPORTANT: choose the transfer interface you're using, 
+//            comment out the unused ones
 #define UART_TR
 // #define I2C_TR
 // #define SPI_TR
@@ -42,9 +42,9 @@ volatile uint16_t sample_index = 0;
 volatile bool sampling_done = false;
 
 // ------------ ADJUST the following variable ------------
-// indicate the current machine, useful for debugging. CHANGE ACCORDINGLY
-unsigned short machine_state = 1; 
-// machine 1 starts off unlocked, the rest starts off locked. CHANGE ACCORDINGLY
+// CHANGE ACCORDINGLY: indicate the current machine, useful for debugging. 
+unsigned short machine_state = 0; 
+// CHANGE ACCORDINGLY: machine 1 starts off unlocked, the rest starts off locked. 
 volatile bool lock = false; 
 
 // digital-to-voltage conversion
@@ -99,8 +99,15 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
 }
 
 
-int clear_buffer(){
-    // TODO: implement buffer clearing
+int clear_buffer(volatile uint16_t* data){
+    // clear the sample buffer
+    for (int i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        data[i] = 0;
+#ifdef RECORD_TIME
+        timestamp[i] = 0; // clear the timestamp buffer if RECORD_TIME is defined
+#endif
+    }
+    
     return 0;
 }
 
@@ -140,7 +147,7 @@ int main() {
         // ------------- Stalling Stage Starts -------------
         // -------------------------------------------------
         // let the first main skips the stalling stage
-        if (machine_state <= 1) {
+        if (machine_state < 1) {
             // set in-mode for receiver pin and pull it up for irq pending
             gpio_set_dir(RECEIVER_PIN, GPIO_IN);
             gpio_pull_up(RECEIVER_PIN);
@@ -191,16 +198,18 @@ int main() {
         // *************************************************
     
     
-        // TODO: clear the BUFFER and reinitialize the counter
-        if(clear_buffer()){
+        // clear the BUFFER and reinitialize the counter
+        if(clear_buffer(sample_buffer)){
             printf("Error: Cannot be clear");
             return 1;
+        } else {
+            // reset the sampling index and flags
+            sample_index = 0;
+            sampling_done = false;
         }
         
         machine_state += MACHINES_EMPLOYED; // increment the machine states for debug
-        lock = true;    // flag the lock status
-        sample_index = 0; // reset the buffer counter
-    
+        lock = true;    // flag the lock status    
     }
     
 #ifdef PRINT_BUFFER_TEST
