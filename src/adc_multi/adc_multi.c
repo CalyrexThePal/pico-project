@@ -2,10 +2,10 @@
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 #include "hardware/timer.h"
-#include "hardware/uart.h"
+#include "adc_multi.h"
 
-#define SENDER_PIN 4 // GPIO-4 - pin used to send flag signal for unstalling main
-#define RECEIVER_PIN 5 // GPIO-5 - pin used to receive flag signal for unstalling main
+#define SENDER_PIN 8 // GPIO-8 - pin used to send flag signal for unstalling main
+#define RECEIVER_PIN 9 // GPIO-9 - pin used to receive flag signal for unstalling main
 
 /*
     ADC configs:
@@ -23,17 +23,17 @@
 #define Fs 50000.0 // Sample rate (Hz) (must not goes higer than 75 kSPS)
 #define ADCCLK 48000000.0 // ADC clock rate (unmutable!)
 
-#define MACHINES_EMPLOYED 3 // how many pi pico we are using
+#define MACHINES_EMPLOYED 3 // how many pico we are using
 
 // ---------------- Preprocessor variable ----------------
-#define PRINT_BUFFER
-#define RECORD_TIME
+// #define PRINT_BUFFER_TEST
+// #define RECORD_TIME
 
-// -------------------- UART Config ----------------------
-#define UART_ID uart0
-#define BAUD_RATE 115200
-#define UART_TX_PIN 0
-#define UART_RX_PIN 1
+// choose the transfer interface you're using
+#define USB_TR
+#define UART_TR
+// #define I2C_TR
+// #define SPI_TR
 
 // ------------------- Buffer Config ---------------------
 volatile uint16_t sample_buffer[SAMPLE_BUFFER_SIZE];
@@ -41,7 +41,7 @@ volatile uint32_t timestamp[SAMPLE_BUFFER_SIZE];
 volatile uint16_t sample_index = 0;
 volatile bool sampling_done = false;
 
-// ------------ Adjust the following variable ------------
+// ------------ ADJUST the following variable ------------
 // indicate the current machine, useful for debugging. CHANGE ACCORDINGLY
 unsigned short machine_state = 1; 
 // machine 1 starts off unlocked, the rest starts off locked. CHANGE ACCORDINGLY
@@ -84,10 +84,11 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
         if (sample_index == BUFFER_THRESHOLD){
             // set out-mode for sender pin, and pull up for irq sending
             gpio_set_dir(SENDER_PIN, GPIO_OUT);
-            gpio_pull_up(SENDER_PIN);
 
-            // TODO: implement signal sending logic to machine 2
-
+            // generate signal sending to machine 2
+            gpio_put(SENDER_PIN, 1);  // set GPIO pin HIGH
+            sleep_us(100);  // wait for pulse duration
+            gpio_put(SENDER_PIN, 0);  // set GPIO pin LOW
         }
 
         // check if the sample index is out of the BUFFER bound
@@ -97,31 +98,21 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
     }
 }
 
-void send_data_uart(volatile uint16_t* data) {
-    // Initialize UART
-    uart_init(UART_ID, BAUD_RATE); 
-    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART); // set GPIO0 as UART TX
-    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART); // set GPIO1 as UART RX
-
-    for (size_t i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        uart_putc_raw(UART_ID, data[i] & 0xFF);        // send lower byte
-        uart_putc_raw(UART_ID, (data[i] >> 8) & 0xFF); // send upper byte
-    }
-}
 
 int clear_buffer(){
     // TODO: implement buffer clearing
+    return 0;
 }
 
 // simple helper print function to print the BUFFER
 void print_buffer(){
-    // output the buffer over serial
+    // output the buffer over UART serial
     for (int i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         uint16_t result = sample_buffer[i];
 #ifdef RECORD_TIME
         uint32_t time = timestamp[i];
         printf("Raw value: %d, voltage: %f, at time: %d\n", result, result * conversion_factor, time);
-#elif
+#else
         printf("Raw value: %d, voltage: %f", result, result * conversion_factor);
 #endif
     }
@@ -132,10 +123,10 @@ int main() {
     printf("Program started\n");
 
     // initialize all the operating pin
-    adc_init();
     gpio_init(ADC_PULSE_PIN);
     gpio_init(RECEIVER_PIN);
     gpio_init(SENDER_PIN);
+    adc_init();
     printf("Operating PIN's initialized\n");
 
     // initialize ADC configurations
@@ -143,62 +134,76 @@ int main() {
     adc_select_input(ADC_CHANNEL);
     adc_set_clkdiv(ADCCLK/Fs); // adjust the sampling rate
     printf("ADC initialized\n");
-
-labelStall:
-
-    // *************************************************
-    // ------------- Stalling Stage Exited -------------
-    // -------------------------------------------------
     
-    // let the first main skips the stalling stage
-    if (machine_state <= 1) {
-        // set in-mode for receiver pin and pull it up for irq pending
-        gpio_set_dir(RECEIVER_PIN, GPIO_IN);
-        gpio_pull_up(RECEIVER_PIN);
-
-        // initialize callback function for stalling stage, unlock once interrupted 
-        gpio_set_irq_enabled_with_callback(RECEIVER_PIN, GPIO_IRQ_EDGE_RISE, true, &unlock_trigger_callback);
-
-        while(lock){
+    while(true){
+        // *************************************************
+        // ------------- Stalling Stage Starts -------------
+        // -------------------------------------------------
+        // let the first main skips the stalling stage
+        if (machine_state <= 1) {
+            // set in-mode for receiver pin and pull it up for irq pending
+            gpio_set_dir(RECEIVER_PIN, GPIO_IN);
+            gpio_pull_up(RECEIVER_PIN);
+    
+            // initialize callback function for stalling stage, unlock once interrupted 
+            gpio_set_irq_enabled_with_callback(RECEIVER_PIN, GPIO_IRQ_EDGE_RISE, true, &unlock_trigger_callback);
+    
+            while(lock){
+                tight_loop_contents();
+            }
+        }
+        // -------------------------------------------------
+        // ------------- Stalling Stage Exited -------------
+        // *************************************************
+    
+    
+        // *************************************************
+        // ---------------- ADC Read Starts ----------------
+        // -------------------------------------------------
+        gpio_set_dir(ADC_PULSE_PIN, GPIO_IN);
+        gpio_pull_up(ADC_PULSE_PIN);
+        gpio_set_irq_enabled_with_callback(ADC_PULSE_PIN, GPIO_IRQ_EDGE_RISE, true, &ADC_trigger_callback);
+        printf("ADC pulse pin initialized\n");
+    
+        while (!sampling_done) {
             tight_loop_contents();
         }
-    }
-    // -------------------------------------------------
-    // ------------- Stalling Stage Exited -------------
-    // *************************************************
-
-
-    // *************************************************
-    // ---------------- ADC Read Starts ----------------
-    // -------------------------------------------------
-    gpio_set_dir(ADC_PULSE_PIN, GPIO_IN);
-    gpio_pull_up(ADC_PULSE_PIN);
-    gpio_set_irq_enabled_with_callback(ADC_PULSE_PIN, GPIO_IRQ_EDGE_RISE, true, &ADC_trigger_callback);
-    printf("ADC pulse pin initialized\n");
-
-    while (!sampling_done) {
-        tight_loop_contents();
-    }
-    // -------------------------------------------------
-    // --------------- ADC Read Complete ---------------
-    // *************************************************
-
-    // buffer transfer using UART interface
-    send_data_uart(sample_buffer);
-
-    // TODO: clear the BUFFER and reinitialize the counter
-    if(clear_buffer()){
-        printf("Error: Cannot be clear");
-        return 1;
-    }    
+        // -------------------------------------------------
+        // --------------- ADC Read Complete ---------------
+        // *************************************************
     
-    machine_state += MACHINES_EMPLOYED; // increment the machine states for debug
-    lock = true;    // flag the lock status 
-    sample_index = 0; // reset the buffer counter
-
-goto labelStall;
-
-#ifdef PRINT_BUFFER
+    
+        // *************************************************
+        // ----------- Buffer Transferring Starts ----------
+        // -------------------------------------------------
+        // buffer transfer using UART interface
+#if defined(UART_TR)
+        send_data_uart(sample_buffer);
+#elif defined(I2C_TR)
+        send_data_i2c(sample_buffer);
+#elif defined(SPI_TR)
+        send_data_spi(sample_buffer);
+#else
+        #error "Please define a transfer Interface!"
+#endif
+        // -------------------------------------------------
+        // ----------- Buffer Transferring Ends ------------
+        // *************************************************
+    
+    
+        // TODO: clear the BUFFER and reinitialize the counter
+        if(clear_buffer()){
+            printf("Error: Cannot be clear");
+            return 1;
+        }
+        
+        machine_state += MACHINES_EMPLOYED; // increment the machine states for debug
+        lock = true;    // flag the lock status
+        sample_index = 0; // reset the buffer counter
+    
+    }
+    
+#ifdef PRINT_BUFFER_TEST
     print_buffer();
 #endif
 
