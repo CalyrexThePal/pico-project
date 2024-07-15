@@ -1,3 +1,19 @@
+/*
+    Author: Xuanyi Wu, UNLV, Deparment of Physics, Zhou's Lab
+
+    About:
+        This program attempts to utilize multiple micro-controller pico to achieve cycling
+    adc reading and buffer transferring. You NEED to adjust the machine state before 
+    compilation.
+        
+    Example:
+        Machine state - 0; Lock status: false
+        Machine state - 1; Lock status: true
+    
+    Usage:
+        In the README file
+*/
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
@@ -20,16 +36,17 @@
 #define SAMPLE_BUFFER_SIZE 32768 
 #define BUFFER_THRESHOLD 22222
 
+// USER EDIT (OPTIONAL)
 #define Fs 50000.0 // Sample rate (Hz) (must not goes higer than 75 kSPS)
 #define ADCCLK 48000000.0 // ADC clock rate (unmutable!)
 
-#define MACHINES_EMPLOYED 3 // how many pico we are using
+#define MACHINES_EMPLOYED 2 // how many pico we are using
 
 // ---------------- Preprocessor variable ----------------
 // #define PRINT_BUFFER_TEST
 // #define RECORD_TIME
 
-// IMPORTANT: choose the transfer interface you're using, 
+// USER EDIT (OPTIONAL): choose the transfer interface you're using, 
 //            comment out the unused ones
 #define UART_TR
 // #define I2C_TR
@@ -42,9 +59,9 @@ volatile uint16_t sample_index = 0;
 volatile bool sampling_done = false;
 
 // ------------ ADJUST the following variable ------------
-// CHANGE ACCORDINGLY: indicate the current machine, useful for debugging. 
-unsigned short machine_state = 0; 
-// CHANGE ACCORDINGLY: machine 1 starts off unlocked, the rest starts off locked. 
+// USER EDIT: indicate the current machine, useful for debugging. 
+unsigned int machine_state = 0; 
+// USER EDIT: machine 1 starts off unlocked, the rest starts off locked. 
 volatile bool lock = false; 
 
 // digital-to-voltage conversion
@@ -60,7 +77,8 @@ void unlock_trigger_callback(uint gpio, uint32_t events) {
 }
 
 /*
-    Callback function for the interrupt that enables the ADC sampling
+    Callback function for the interrupt that enables the ADC sampling,
+    send pulse signal if buffer threshold is reacheds
     Parameter:
         uint gpio       - the operating pin
         uint32_t events - the event to trigger the callback fuction 
@@ -87,7 +105,7 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
 
             // generate signal sending to machine 2
             gpio_put(SENDER_PIN, 1);  // set GPIO pin HIGH
-            sleep_us(100);  // wait for pulse duration
+            sleep_us(100);  // pulse duration
             gpio_put(SENDER_PIN, 0);  // set GPIO pin LOW
         }
 
@@ -127,27 +145,30 @@ void print_buffer(){
 
 int main() {
     stdio_init_all(); // initialize stdio lib
-    printf("Program started\n");
+    sleep_ms(5000); // wait for USB initialization
+    printf("USB initilization completed")
 
     // initialize all the operating pin
     gpio_init(ADC_PULSE_PIN);
     gpio_init(RECEIVER_PIN);
     gpio_init(SENDER_PIN);
     adc_init();
-    printf("Operating PIN's initialized\n");
 
     // initialize ADC configurations
     adc_gpio_init(ADC_PIN);
     adc_select_input(ADC_CHANNEL);
     adc_set_clkdiv(ADCCLK/Fs); // adjust the sampling rate
-    printf("ADC initialized\n");
     
+    printf("Machine state (pins) %d is initialized... \n", machine_state);
+
     while(true){
+
         // *************************************************
         // ------------- Stalling Stage Starts -------------
         // -------------------------------------------------
         // let the first main skips the stalling stage
-        if (machine_state < 1) {
+        if (machine_state > 1) {
+            printf("Machine state %d is stalling! \n", machine_state);
             // set in-mode for receiver pin and pull it up for irq pending
             gpio_set_dir(RECEIVER_PIN, GPIO_IN);
             gpio_pull_up(RECEIVER_PIN);
@@ -164,14 +185,15 @@ int main() {
         // *************************************************
     
     
+
         // *************************************************
         // ---------------- ADC Read Starts ----------------
         // -------------------------------------------------
+        printf("Machine state %d is starts ADC capturing! \n", machine_state);
         gpio_set_dir(ADC_PULSE_PIN, GPIO_IN);
         gpio_pull_up(ADC_PULSE_PIN);
         gpio_set_irq_enabled_with_callback(ADC_PULSE_PIN, GPIO_IRQ_EDGE_RISE, true, &ADC_trigger_callback);
-        printf("ADC pulse pin initialized\n");
-    
+
         while (!sampling_done) {
             tight_loop_contents();
         }
@@ -179,7 +201,8 @@ int main() {
         // --------------- ADC Read Complete ---------------
         // *************************************************
     
-    
+        printf("Machine state %d finished reading and now starts transferring! \n", machine_state);
+
         // *************************************************
         // ----------- Buffer Transferring Starts ----------
         // -------------------------------------------------
@@ -197,10 +220,11 @@ int main() {
         // ----------- Buffer Transferring Ends ------------
         // *************************************************
     
-    
+        printf("Machine state %d has finished transferring! \n", machine_state);
+
         // clear the BUFFER and reinitialize the counter
         if(clear_buffer(sample_buffer)){
-            printf("Error: Cannot be clear");
+            printf("Error: Buffer cannot be clear. \n");
             return 1;
         } else {
             // reset the sampling index and flags
@@ -208,6 +232,7 @@ int main() {
             sampling_done = false;
         }
         
+        printf("Machine state %d has finished state-reset.. \n", machine_state);
         machine_state += MACHINES_EMPLOYED; // increment the machine states for debug
         lock = true;    // flag the lock status    
     }
