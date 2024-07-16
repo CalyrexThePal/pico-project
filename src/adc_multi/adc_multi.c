@@ -43,7 +43,6 @@
 #define MACHINES_EMPLOYED 2 // how many pico we are using
 
 // ---------------- Preprocessor variable ----------------
-// #define PRINT_BUFFER_TEST
 // #define RECORD_TIME
 
 // USER EDIT (OPTIONAL): choose the transfer interface you're using, 
@@ -51,6 +50,7 @@
 #define UART_TR
 // #define I2C_TR
 // #define SPI_TR
+// #define PRINT_BUFFER_USB
 
 // ------------------- Buffer Config ---------------------
 volatile uint16_t sample_buffer[SAMPLE_BUFFER_SIZE];
@@ -130,7 +130,7 @@ int clear_buffer(volatile uint16_t* data){
 }
 
 // simple helper print function to print the BUFFER
-void print_buffer(){
+void print_buffer_usb(){
     // output the buffer over UART serial
     for (int i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         uint16_t result = sample_buffer[i];
@@ -213,6 +213,8 @@ int main() {
         send_data_i2c(sample_buffer);
 #elif defined(SPI_TR)
         send_data_spi(sample_buffer);
+#elif defined(PRINT_BUFFER_USB)
+        print_buffer_usb();
 #else
         #error "Please define a transfer Interface!"
 #endif
@@ -236,10 +238,6 @@ int main() {
         machine_state += MACHINES_EMPLOYED; // increment the machine states for debug
         lock = true;    // flag the lock status    
     }
-    
-#ifdef PRINT_BUFFER_TEST
-    print_buffer();
-#endif
 
     return 0;
 }
