@@ -12,6 +12,6 @@ int main() {
         sleep_ms(5000);
         gpio_put(LED_PIN, 0);
         sleep_ms(5000);
-	counter = counter+1;
+	    counter = counter+1;
     }
 }
