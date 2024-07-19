@@ -32,8 +32,7 @@
         NULL
 */
 void send_data_uart(volatile uint16_t* data) {
-    // Initialize UART
-    uart_init(UART_ID, BAUD_RATE); 
+    uart_init(UART_ID, BAUD_RATE); // initialize UART
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART); // set GPIO0 as UART TX
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART); // set GPIO1 as UART RX
 
