@@ -18,7 +18,7 @@
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 #include "adc_timer.h"
-#include "adc_multi.h"
+#include "adc_tr.h"
 
 #define SENDER_PIN 8        // GPIO-8 - pin used to send flag signal for unstalling main
 #define RECEIVER_PIN 9      // GPIO-9 - pin used to receive flag signal for unstalling main

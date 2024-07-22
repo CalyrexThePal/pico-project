@@ -23,14 +23,11 @@
 #define PIN_SCK 18
 #define PIN_MOSI 19
 
-/*
-    Data sending function via UART interface, configure UART TX and RX pins
-    and transfter the data in two-bytes format
-    Parameter:
-        data    -   the buffer address
-    Return:
-        NULL
-*/
+#define TR_FLAG_PIN 10
+
+
+// TEMPLATE: data sending function via UART interface, configure UART TX and 
+// RX pins and transfter the data in two-bytes format
 void send_data_uart(volatile uint16_t* data) {
     uart_init(UART_ID, BAUD_RATE); // initialize UART
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART); // set GPIO0 as UART TX
@@ -42,7 +39,7 @@ void send_data_uart(volatile uint16_t* data) {
     }
 }
 
-// similar function like the UART example but use i2c interface instead
+// TEMPLATE: similar function like the UART example but use i2c interface instead
 void send_data_via_i2c(volatile uint16_t* data) {
     i2c_init(I2C_PORT, 100 * 1000);  // initialize I2C at 100kHz
     gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C);
@@ -50,7 +47,14 @@ void send_data_via_i2c(volatile uint16_t* data) {
     gpio_pull_up(I2C_SDA_PIN);
     gpio_pull_up(I2C_SCL_PIN);
 
+    gpio_init(TR_FLAG_PIN);
+    gpio_set_dir(TR_FLAG_PIN, GPIO_IN);
+    gpio_pull_up(TR_FLAG_PIN);
+
     for (size_t i = 0; i < BUFFER_SIZE; i++) {
+        while (gpio_get(TR_FLAG_PIN) == 0) {
+            tight_loop_contents();
+        }
         uint8_t lower_byte = data[i] & 0xFF;
         uint8_t upper_byte = (data[i] >> 8) & 0xFF;
 
@@ -59,7 +63,7 @@ void send_data_via_i2c(volatile uint16_t* data) {
     }
 }
 
-// the spi interface example
+// the spi interface
 void send_data_via_spi(volatile uint16_t* data) {
     spi_init(SPI_PORT, 500 * 1000);  // initialize SPI at 500kHz
     gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
@@ -71,7 +75,17 @@ void send_data_via_spi(volatile uint16_t* data) {
     gpio_set_dir(PIN_CS, GPIO_OUT);
     gpio_put(PIN_CS, 1);  // deassert CS
 
+    // init TR-flag pin
+    gpio_init(TR_FLAG_PIN);
+    gpio_set_dir(TR_FLAG_PIN, GPIO_IN);
+    gpio_pull_up(TR_FLAG_PIN);
+
     for (size_t i = 0; i < BUFFER_SIZE; i++) {
+        // wait until the receiver is ready
+        while (gpio_get(TR_FLAG_PIN) == 0) {
+            tight_loop_contents();
+        }
+
         uint8_t lower_byte = data[i] & 0xFF;
         uint8_t upper_byte = (data[i] >> 8) & 0xFF;
 
