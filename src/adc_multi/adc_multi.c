@@ -33,8 +33,8 @@
 #define ADC_CHANNEL 0       // ADC channels, pick from 0-3 (4 is reserved for temp. sensor)
 
 // choose your buffer size (power of 2), 2^(x=15) to avoid page fault
-#define SAMPLE_BUFFER_SIZE 32768
-#define BUFFER_THRESHOLD 30000
+#define SAMPLE_BUFFER_SIZE 12000
+#define BUFFER_THRESHOLD 11900
 
 // USER EDIT (OPTIONAL)
 #define Fs 50000.0          // Sample rate (Hz) (must not goes higer than 75 kSPS)
@@ -222,8 +222,8 @@ int main() {
 #elif defined(SPI_TR)
         send_data_spi(sample_buffer);
 #elif defined(PRINT_BUFFER_USB)
-        // print_buffer_usb();
-        sleep_ms_low_level(2000);
+        print_buffer_usb();
+        // sleep_ms_low_level(2000);
 #else
         #error "Please define a transfer Interface!"
 #endif

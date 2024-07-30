@@ -2,7 +2,7 @@
 #include "hardware/i2c.h"
 #include "hardware/spi.h"
 
-#define BUFFER_SIZE 32768
+#define BUFFER_SIZE 12000
 
 // -------------------- UART Config ----------------------
 #define UART_ID uart0
@@ -25,8 +25,11 @@
 
 #define TR_FLAG_PIN 10
 
+// Ready/Busy signal pin
+#define PIN_READY 13
+#define PIN_ACK 14
 
-// TEMPLATE: data sending function via UART interface, configure UART TX and 
+// REDO: data sending function via UART interface, configure UART TX and 
 // RX pins and transfter the data in two-bytes format
 void send_data_uart(volatile uint16_t* data) {
     uart_init(UART_ID, BAUD_RATE); // initialize UART
@@ -39,7 +42,7 @@ void send_data_uart(volatile uint16_t* data) {
     }
 }
 
-// TEMPLATE: similar function like the UART example but use i2c interface instead
+// REDO: similar function like the UART example but use i2c interface instead
 void send_data_via_i2c(volatile uint16_t* data) {
     i2c_init(I2C_PORT, 100 * 1000);  // initialize I2C at 100kHz
     gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C);
@@ -58,8 +61,10 @@ void send_data_via_i2c(volatile uint16_t* data) {
         uint8_t lower_byte = data[i] & 0xFF;
         uint8_t upper_byte = (data[i] >> 8) & 0xFF;
 
+        gpio_put(PIN_CS, 0);  // assert CS
         i2c_write_blocking(I2C_PORT, I2C_ADDR, &lower_byte, 1, true);
         i2c_write_blocking(I2C_PORT, I2C_ADDR, &upper_byte, 1, false);
+        gpio_put(PIN_CS, 1);  // deassert CS
     }
 }
 
@@ -75,23 +80,13 @@ void send_data_via_spi(volatile uint16_t* data) {
     gpio_set_dir(PIN_CS, GPIO_OUT);
     gpio_put(PIN_CS, 1);  // deassert CS
 
-    // init TR-flag pin
-    gpio_init(TR_FLAG_PIN);
-    gpio_set_dir(TR_FLAG_PIN, GPIO_IN);
-    gpio_pull_up(TR_FLAG_PIN);
-
-    for (size_t i = 0; i < BUFFER_SIZE; i++) {
-        // wait until the receiver is ready
-        while (gpio_get(TR_FLAG_PIN) == 0) {
-            tight_loop_contents();
-        }
-
-        uint8_t lower_byte = data[i] & 0xFF;
-        uint8_t upper_byte = (data[i] >> 8) & 0xFF;
-
-        gpio_put(PIN_CS, 0);  // assert CS
-        spi_write_blocking(SPI_PORT, &lower_byte, 1);  
-        spi_write_blocking(SPI_PORT, &upper_byte, 1);  
-        gpio_put(PIN_CS, 1);  // deassert CS
+    uint8_t spi_buffer[size*2];
+    for (size_t i = 0; i < size; i++) {
+        spi_buffer[2*i] = buffer[i] & 0xFF;
+        spi_buffer[2*i+1] = (buffer[i] >> 8) & 0xFF;
     }
+
+    gpio_put(PIN_CS, 0);  // assert CS
+    spi_write_blocking(SPI_PORT, spi_buffer, size*2);
+    gpio_put(PIN_CS, 1);  // deassert CS
 }
