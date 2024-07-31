@@ -1,5 +1,5 @@
 /*
-    Author: Xuanyi Wu, UNLV, Deparment of Physics, Zhou's Lab
+    Author: CalyrexThePal
 
     About:
         This program attempts to utilize multiple micro-controller pico to achieve cycling
@@ -50,13 +50,15 @@
 // #define UART_TR
 // #define I2C_TR
 // #define SPI_TR
-#define PRINT_BUFFER_USB
+#define PRINT_BUFFER_USB_TR
 
 // ------------------- Buffer Config ---------------------
-volatile uint16_t sample_buffer[SAMPLE_BUFFER_SIZE];
-volatile uint32_t timestamp[SAMPLE_BUFFER_SIZE];
-volatile uint16_t sample_index = 0;
-volatile bool sampling_done = false;
+volatile uint16_t sample_buffer[SAMPLE_BUFFER_SIZE]; // buffer that stores all the ADC values
+#ifdef RECORD_TIME
+volatile uint32_t timestamp[SAMPLE_BUFFER_SIZE]; // buffer that stores timestamp values
+#endif
+volatile uint16_t sample_index = 0; // buffer index, current ADC value
+volatile bool sampling_done = false;    // flag to signal if sampling is done
 
 // **********************************************************************
 // ------------ IMPORTANT: ADJUST THE FOLLOWING VARIABLE !!! ------------
@@ -64,8 +66,8 @@ volatile bool sampling_done = false;
 unsigned int machine_state = 0; // USER EDIT: indicate the current machine, useful for debugging. 
 volatile bool lock = false;     // USER EDIT: machine  starts off unlocked, the rest starts off locked. 
 
-// digital-to-voltage conversion
-const float conversion_factor = 3.3f / (1 << 12); 
+// digital-to-voltage conversion, convert ADC values to voltage
+const float conversion_factor = 3.3f/(1<<12); 
 
 // *************************** Program Starts ***************************
 
@@ -73,8 +75,8 @@ const float conversion_factor = 3.3f / (1 << 12);
     Callback function to unlock the stalling flag before reading
 */
 void unlock_trigger_callback(uint gpio, uint32_t events) {
-    gpio_set_irq_enabled(RECEIVER_PIN, GPIO_IRQ_EDGE_RISE, false);
-    lock = false;
+    gpio_set_irq_enabled(RECEIVER_PIN, GPIO_IRQ_EDGE_RISE, false);  // temporarilly disable the irq service for receiver pin
+    lock = false;   // unlock
 }
 
 /*
@@ -91,13 +93,14 @@ void unlock_trigger_callback(uint gpio, uint32_t events) {
 */
 void ADC_trigger_callback(uint gpio, uint32_t events) {
     if (sample_index < SAMPLE_BUFFER_SIZE) {
-        // single ADC sample acquire
-        sample_buffer[sample_index] = adc_read();
+        
+        sample_buffer[sample_index] = adc_read();   // single ADC sample acquire
 
 #ifdef RECORD_TIME
         timestamp[sample_index] = time_us_32(); // get timestamp in microsecond
 #endif
-        sample_index++;
+
+        sample_index++; // increment the sampling index
 
         // check if the index exceeds certain threshold
         if (sample_index == BUFFER_THRESHOLD){
@@ -108,7 +111,6 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
             gpio_put(SENDER_PIN, 1);  // set GPIO pin HIGH
             sleep_us_low_level(5);
             gpio_put(SENDER_PIN, 0);  // set GPIO pin LOW
-
         }
 
         // check if the sample index is out of the BUFFER bound
@@ -221,7 +223,7 @@ int main() {
         send_data_i2c(sample_buffer);
 #elif defined(SPI_TR)
         send_data_spi(sample_buffer);
-#elif defined(PRINT_BUFFER_USB)
+#elif defined(PRINT_BUFFER_USB_TR)
         print_buffer_usb();
         // sleep_ms_low_level(2000);
 #else
@@ -245,7 +247,7 @@ int main() {
         
         printf("Machine state %d: state reset completed.. \n\n\n", machine_state);
         machine_state += MACHINES_EMPLOYED; // increment the machine states for debug
-        lock = true;    // flag the lock status    
+        lock = true;    // lock up the main, re-entring stalling stage
     }
 
     return 0;

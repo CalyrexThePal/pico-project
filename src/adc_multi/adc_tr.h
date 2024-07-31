@@ -25,10 +25,6 @@
 
 #define TR_FLAG_PIN 10
 
-// Ready/Busy signal pin
-#define PIN_READY 13
-#define PIN_ACK 14
-
 // REDO: data sending function via UART interface, configure UART TX and 
 // RX pins and transfter the data in two-bytes format
 void send_data_uart(volatile uint16_t* data) {
