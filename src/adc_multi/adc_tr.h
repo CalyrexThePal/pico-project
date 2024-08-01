@@ -76,13 +76,13 @@ void send_data_via_spi(volatile uint16_t* data) {
     gpio_set_dir(PIN_CS, GPIO_OUT);
     gpio_put(PIN_CS, 1);  // deassert CS
 
-    uint8_t spi_buffer[size*2];
-    for (size_t i = 0; i < size; i++) {
-        spi_buffer[2*i] = buffer[i] & 0xFF;
-        spi_buffer[2*i+1] = (buffer[i] >> 8) & 0xFF;
+    uint8_t spi_buffer[BUFFER_SIZE*2];
+    for (size_t i = 0; i < BUFFER_SIZE; i++) {
+        spi_buffer[2*i] = data[i] & 0xFF;
+        spi_buffer[2*i+1] = (data[i] >> 8) & 0xFF;
     }
 
     gpio_put(PIN_CS, 0);  // assert CS
-    spi_write_blocking(SPI_PORT, spi_buffer, size*2);
+    spi_write_blocking(SPI_PORT, spi_buffer, BUFFER_SIZE*2);
     gpio_put(PIN_CS, 1);  // deassert CS
 }
