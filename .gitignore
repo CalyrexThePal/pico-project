@@ -1,2 +1,8 @@
 build
 .vscode
+.bin
+.txt
+.pdf
+.doc
+.docx
+a.out

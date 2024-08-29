@@ -1,34 +1,23 @@
 import spidev
-import threading
+import time
 
-BUFFER_SIZE = 10000
-SPI0_DEV = "/dev/spidev0.0"
-SPI1_DEV = "/dev/spidev1.0"
-FILE0 = "data_spi0.bin"
-FILE1 = "data_spi1.bin"
+# Initialize SPI
+spi = spidev.SpiDev()
+spi.open(0, 1)  # (bus, device) -> (SPI bus, chip select)
+spi.max_speed_hz = 992063  # set the SPI clock speed
+spi.mode = 0b00  # SPI mode (0, 1, 2, or 3)
 
-def save_data(filename, data):
-    with open(filename, "wb") as f:
-        f.write(data)
+# Function to receive data
+def receive_spi_data(num_bytes):
+    # Send dummy bytes (0x00) to receive data
+    received_data = spi.xfer2([0x42] * num_bytes, 1000 * 1000, 5000)
+    return received_data
 
-def receive_data(spi_dev, filename):
-    spi = spidev.SpiDev()
-    spi.open(0, spi_dev)
-    spi.max_speed_hz = 500000
-
+# Example usage
+try:
     while True:
-        data = spi.readbytes(BUFFER_SIZE*2)
-        save_data(filename, data)
-
-def main():
-    t0 = threading.Thread(target=receive_data, args=(0, FILE0))
-    t1 = threading.Thread(target=receive_data, args=(1, FILE1))
-
-    t0.start()
-    t1.start()
-
-    t0.join()
-    t1.join()
-
-if __name__ == "__main__":
-    main()
+        data = receive_spi_data(256)  
+        print(f"Received data: {data}")
+        time.sleep(5)
+except KeyboardInterrupt:
+    spi.close()
