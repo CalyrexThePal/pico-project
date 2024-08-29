@@ -1,48 +1,75 @@
+#include <stdio.h>
+#include <stdint.h>
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 
-// spi pins
-#define SPI_PORT spi0
-#define PIN_MISO 16
-#define PIN_CS 17
-#define PIN_SCK 18
-#define PIN_MOSI 19
+#define BUF_LEN                 0x100
+#define CLOCK_FREQUENCY         1000000
+#define SPI_PORT                spi0
 
-#define SIZE 5000
-
-uint16_t buffer[SIZE];
-
-// the spi interface
-void send_data_via_spi(volatile uint16_t *buffer){
-    
-    // ------------- BASIC SPI CONFIG -------------
-    spi_init(SPI_PORT, 500 * 1000);
-    gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_CS, GPIO_FUNC_SIO);
-    gpio_set_function(PIN_SCK, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
-
-    gpio_init(PIN_CS);
-    gpio_set_dir(PIN_CS, GPIO_OUT);
-    gpio_put(PIN_CS, 1); // deassert CS
-
-    uint8_t spi_buffer[SIZE * 2];
-    for (size_t i = 0; i < SIZE; i++){
-        spi_buffer[2 * i] = buffer[i] & 0xFF;
-        spi_buffer[2 * i + 1] = (buffer[i] >> 8) & 0xFF;
+// helper function to print buffer
+void printbuf(uint16_t buf[], size_t len) {
+    size_t i;
+    for (i = 0; i < len; ++i) {
+        if (i % 16 == 15)
+            printf("%02x\n", buf[i]);
+        else
+            printf("%02x ", buf[i]);
     }
 
-    gpio_put(PIN_CS, 0); // assert CS
-    spi_write_blocking(SPI_PORT, spi_buffer, SIZE * 2);
-    gpio_put(PIN_CS, 1); // deassert CS
+    // append trailing newline if there isn't one
+    if (i % 16) {
+        putchar('\n');
+    }
 }
 
-int main(){
-    stdio_init_all(); // initialize stdio lib
-    sleep_ms(8000);   // wait for USB initialization
+int main() {
+    // enable usb so we can print
+    stdio_init_all();
+    sleep_ms(3000);
 
-    for (int i = 0; i < SIZE; i++){
-        buffer[i] = i;
+#if !defined(spi_default) || \
+    !defined(PICO_DEFAULT_SPI_SCK_PIN) || \
+    !defined(PICO_DEFAULT_SPI_TX_PIN) || \
+    !defined(PICO_DEFAULT_SPI_RX_PIN) || \
+    !defined(PICO_DEFAULT_SPI_CSN_PIN)
+#warning spi/spi_master example requires a board with SPI pins
+    puts("Default SPI pins were not defined");
+#else
+
+    printf("SPI master example\n");
+
+    // enable SPI 0 at 1 MHz and connect to GPIOs
+    spi_init(SPI_PORT, CLOCK_FREQUENCY);
+    spi_set_slave(SPI_PORT, true); // Set SPI0 to slave mode
+    spi_set_format(SPI_PORT, 16, 0, 0, 0);
+    gpio_set_function(PICO_DEFAULT_SPI_RX_PIN, GPIO_FUNC_SPI);
+    gpio_set_function(PICO_DEFAULT_SPI_SCK_PIN, GPIO_FUNC_SPI);
+    gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
+    gpio_set_function(PICO_DEFAULT_SPI_CSN_PIN, GPIO_FUNC_SPI);
+
+    uint16_t out_buf[BUF_LEN], in_buf[BUF_LEN];
+
+    printf("The baudrate is at: %u\n Hz", spi_get_baudrate(SPI_PORT));
+
+    uint16_t b16_num = 0x1000;
+    // initialize output buffer
+    for (size_t i = 0; i < BUF_LEN; ++i) {
+        out_buf[i] = b16_num + i;
     }
-    send_data_via_spi(buffer);
+
+    printf("SPI master says: The following buffer \
+            will be written to MOSI endlessly:\n");
+            
+    printbuf(out_buf, BUF_LEN);
+
+    // indefinite loop
+    for (size_t i = 0; ; ++i) {
+        // write the output buffer to MOSI, and at the same time read from MISO.
+        spi_write16_read16_blocking(SPI_PORT, out_buf, in_buf, BUF_LEN);
+        
+        // sleep for a little bit of time.
+        sleep_ms(1000);
+    }
+#endif
 }
