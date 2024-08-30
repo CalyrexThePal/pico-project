@@ -15,6 +15,8 @@ if (TARGET tinyusb_device)
     # add url via pico_set_program_url
     example_auto_set_url(SPI_test)
 
+    pico_enable_stdio_usb(SPI_test 1)
+
 elseif(PICO_ON_DEVICE)
         message(WARNING "not building the program becuase TinyUSB submodule is not initialized in the SDK")
 endif()
