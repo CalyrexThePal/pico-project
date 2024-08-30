@@ -45,10 +45,6 @@
 // ---------------- Preprocessor variable ----------------
 // #define RECORD_TIME
 
-// USER EDIT (OPTIONAL): choose the transfer interface you're using, 
-//                       comment out the unused ones
-// #define UART_TR
-// #define I2C_TR
 // #define SPI_TR
 #define PRINT_BUFFER_USB_TR
 
@@ -217,11 +213,8 @@ int main() {
         // ----------- Buffer Transferring Starts ----------
         // -------------------------------------------------
         // buffer transfer using UART interface
-#if defined(UART_TR)
-        send_data_uart(sample_buffer);
-#elif defined(I2C_TR)
-        send_data_i2c(sample_buffer);
-#elif defined(SPI_TR)
+
+#if defined(SPI_TR)
         send_data_spi(sample_buffer);
 #elif defined(PRINT_BUFFER_USB_TR)
         print_buffer_usb();

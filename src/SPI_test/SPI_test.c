@@ -3,9 +3,9 @@
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 
-#define BUF_LEN                 0x100
-#define CLOCK_FREQUENCY         1000000
 #define SPI_PORT                spi0
+#define BUF_LEN                 0x3000  // buffer size: 12288
+#define CLOCK_FREQUENCY         1000000 
 
 // helper function to print buffer
 void printbuf(uint16_t buf[], size_t len) {
@@ -61,7 +61,7 @@ int main() {
     printf("SPI master says: The following buffer \
             will be written to MOSI endlessly:\n");
             
-    printbuf(out_buf, BUF_LEN);
+    // printbuf(out_buf, BUF_LEN);
 
     // indefinite loop
     for (size_t i = 0; ; ++i) {
