@@ -1,6 +1,4 @@
 /*
-    Author: CalyrexThePal
-
     About:
         This program attempts to utilize multiple micro-controller pico to achieve cycling
     adc reading and buffer transferring. You NEED to adjust the machine state before 
@@ -32,7 +30,7 @@
 #define ADC_PIN 26          // ADC0 aka GPIO-26, pin corresponding to adc unit
 #define ADC_CHANNEL 0       // ADC channels, pick from 0-3 (4 is reserved for temp. sensor)
 
-// choose your buffer size (power of 2), 2^(x=15) to avoid page fault
+// choose buffer size 
 #define SAMPLE_BUFFER_SIZE 12000
 #define BUFFER_THRESHOLD 11900
 
@@ -43,10 +41,9 @@
 #define MACHINES_EMPLOYED 2 // how many pico we are using
 
 // ---------------- Preprocessor variable ----------------
-// #define RECORD_TIME
 
-// #define SPI_TR
-#define PRINT_BUFFER_USB_TR
+// #define RECORD_TIME
+#define SPI_TR
 
 // ------------------- Buffer Config ---------------------
 volatile uint16_t sample_buffer[SAMPLE_BUFFER_SIZE]; // buffer that stores all the ADC values
@@ -59,8 +56,11 @@ volatile bool sampling_done = false;    // flag to signal if sampling is done
 // **********************************************************************
 // ------------ IMPORTANT: ADJUST THE FOLLOWING VARIABLE !!! ------------
 // **********************************************************************
-unsigned int machine_state = 0; // USER EDIT: indicate the current machine, useful for debugging. 
-volatile bool lock = false;     // USER EDIT: machine  starts off unlocked, the rest starts off locked. 
+
+// USER EDIT: indicate the current machine, useful for debugging.
+unsigned int machine_state = 0;
+// USER EDIT: machine 0 starts off unlocked, the rest starts off locked.
+volatile bool lock = false;
 
 // digital-to-voltage conversion, convert ADC values to voltage
 const float conversion_factor = 3.3f/(1<<12); 
@@ -71,13 +71,16 @@ const float conversion_factor = 3.3f/(1<<12);
     Callback function to unlock the stalling flag before reading
 */
 void unlock_trigger_callback(uint gpio, uint32_t events) {
-    gpio_set_irq_enabled(RECEIVER_PIN, GPIO_IRQ_EDGE_RISE, false);  // temporarilly disable the irq service for receiver pin
+    // temporarilly disable the irq service for receiver pin
+    gpio_set_irq_enabled(RECEIVER_PIN, GPIO_IRQ_EDGE_RISE, false);  
     lock = false;   // unlock
 }
 
 /*
-    Callback function for the interrupt that enables the ADC sampling,
-    send pulse signal if buffer threshold is reacheds
+    Function:
+        Callback function for the interrupt that enables the ADC sampling, 
+    send pulse signal if buffer threshold is reached
+
     Parameter:
         uint gpio       - the operating pin
         uint32_t events - the event to trigger the callback fuction 
@@ -101,12 +104,15 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
         // check if the index exceeds certain threshold
         if (sample_index == BUFFER_THRESHOLD){
             // set out-mode for sender pin, and pull up for irq sending
-            gpio_set_dir(SENDER_PIN, GPIO_OUT);
+            gpio_set_dir(SENDER_PIN, GPIO_OUT); // impedence low
 
             // generate signal sending to machine 2
             gpio_put(SENDER_PIN, 1);  // set GPIO pin HIGH
-            sleep_us_low_level(5);
+            sleep_ms_low_level(10);
             gpio_put(SENDER_PIN, 0);  // set GPIO pin LOW
+
+            // temporarily disable gpio
+            // gpio_set_dir(gpio, GPIO_IN); // impedence high
         }
 
         // check if the sample index is out of the BUFFER bound
@@ -129,23 +135,9 @@ int clear_buffer(volatile uint16_t* data){
     return 0;
 }
 
-// simple helper print function to print the BUFFER
-void print_buffer_usb(){
-    // output the buffer over UART serial
-    for (int i = 0; i < 20; i++) {
-        uint16_t result = sample_buffer[i];
-#ifdef RECORD_TIME
-        uint32_t time = timestamp[i];
-        printf("Raw value: %d, voltage: %f, at time: %d\n", result, result * conversion_factor, time);
-#else
-        printf("Raw value: %d, voltage: %f\n", result, result * conversion_factor);
-#endif
-    }
-}
-
 int main() {
-    stdio_init_all(); // initialize stdio lib
-    sleep_ms(5000); // wait for USB initialization
+    stdio_init_all();           // initialize stdio lib
+    sleep_ms_low_level(5000);   // wait for USB initialization
     printf("USB initilization completed \n\n");
 
     // initialize all the operating pin
@@ -179,8 +171,7 @@ int main() {
                 tight_loop_contents();
             }
 
-            // disable the IRS for receiver pin after unlocking stalling stage
-            
+            gpio_set_irq_enabled(RECEIVER_PIN, GPIO_IRQ_EDGE_RISE, false);
         }
         // -------------------------------------------------
         // ------------- Stalling Stage Exited -------------
@@ -212,20 +203,19 @@ int main() {
         // *************************************************
         // ----------- Buffer Transferring Starts ----------
         // -------------------------------------------------
-        // buffer transfer using UART interface
-
 #if defined(SPI_TR)
-        send_data_spi(sample_buffer);
+        send_data_via_spi(sample_buffer);
 #elif defined(PRINT_BUFFER_USB_TR)
         print_buffer_usb();
         // sleep_ms_low_level(2000);
 #else
         #error "Please define a transfer Interface!"
 #endif
+        // sleep_ms_low_level(6000);
         // -------------------------------------------------
         // ----------- Buffer Transferring Ends ------------
         // *************************************************
-    
+
         printf("Machine state %d: transferring finished , now clearing the buffer! \n", machine_state);
 
         // clear the BUFFER and reinitialize the counter

@@ -27,7 +27,7 @@ void send_data_via_spi(volatile uint16_t* buff) {
     puts("Default SPI pins were not defined");
 #else
 
-    printf("SPI master example\n");
+    printf("SPI unit invoked\n");
 
     // enable SPI 0 at 1 MHz and connect to GPIOs
     spi_init(SPI_PORT, CLOCK_FREQUENCY);
@@ -38,18 +38,10 @@ void send_data_via_spi(volatile uint16_t* buff) {
     gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
     gpio_set_function(PICO_DEFAULT_SPI_CSN_PIN, GPIO_FUNC_SPI);
 
-    printf("The baudrate is at: %u\n Hz", spi_get_baudrate(SPI_PORT));
+    printf("The baudrate is at: %u Hz \n", spi_get_baudrate(SPI_PORT));
 
-    printf("SPI master says: The following buffer \
-            will be written to MOSI endlessly:\n");
-
-    // indefinite loop
-    for (size_t i = 0; ; ++i) {
-        // write the output buffer to MOSI, and at the same time read from MISO.
-        spi_write16_blocking(SPI_PORT, (const uint16_t*)buff, BUFFER_SIZE);
-        
-        // sleep for a little bit of time.
-        sleep_ms(1000);
-    }
+    // write the output buffer to MOSI, and at the same time read from MISO.
+    // spi_write16_blocking(SPI_PORT, (const uint16_t*)buff, BUFFER_SIZE);
+    
 #endif
 }
