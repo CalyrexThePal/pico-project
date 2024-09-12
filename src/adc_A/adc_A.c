@@ -112,7 +112,7 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
             gpio_put(SENDER_PIN, 0);  // set GPIO pin LOW
 
             // temporarily disable gpio
-            // gpio_set_dir(gpio, GPIO_IN); // impedence high
+            gpio_set_dir(gpio, GPIO_IN); // impedence high
         }
 
         // check if the sample index is out of the BUFFER bound
@@ -205,8 +205,6 @@ int main() {
         // -------------------------------------------------
 #if defined(SPI_TR)
         send_data_via_spi(sample_buffer);
-#elif defined(PRINT_BUFFER_USB_TR)
-        print_buffer_usb();
         // sleep_ms_low_level(2000);
 #else
         #error "Please define a transfer Interface!"

@@ -7,4 +7,7 @@ build
 .docx
 a.out
 .lgd-nfy0
-data.bin
+data0.bin
+data1.bin
+receiver/SPI_0
+receiver/SPI_1

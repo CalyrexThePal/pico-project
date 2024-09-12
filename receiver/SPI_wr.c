@@ -24,7 +24,8 @@
 #include <sys/ioctl.h>
 
 // define the SPI device
-#define SPI_DEVICE      "/dev/spidev0.0"
+// #define SPI_DEVICE      "/dev/spidev0.0"
+#define SPI_DEVICE      "/dev/spidev1.0"
 #define BUFF_LEN        0x3000   // buffer size
 #define CLOCK_FREQ      992063  // clock frequency, match this to the slave device baudrate
 
@@ -37,7 +38,7 @@ int main() {
     }
 
     // open the binary file for writing
-    FILE *bin_file = fopen("data.bin", "wb");
+    FILE *bin_file = fopen("data1.bin", "wb");
     if (bin_file == NULL) {
         perror("Error opening binary file");
         close(spi_fd);

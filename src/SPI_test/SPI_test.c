@@ -50,7 +50,7 @@ int main() {
 
     uint16_t out_buf[BUF_LEN], in_buf[BUF_LEN];
 
-    printf("The baudrate is at: %u\n Hz", spi_get_baudrate(SPI_PORT));
+    printf("The baudrate is at: %u Hz\n", spi_get_baudrate(SPI_PORT));
 
     uint16_t b16_num = 0x1000;
     // initialize output buffer
@@ -58,18 +58,22 @@ int main() {
         out_buf[i] = b16_num + i;
     }
 
-    printf("SPI master says: The following buffer \
-            will be written to MOSI endlessly:\n");
-            
+    printf("SPI master says: The following buffer will be written to MASTER once:\n");
+
     // printbuf(out_buf, BUF_LEN);
 
     // indefinite loop
-    for (size_t i = 0; ; ++i) {
+    // for (size_t i = 0; ; ++i) {
         // write the output buffer to MOSI, and at the same time read from MISO.
         spi_write16_read16_blocking(SPI_PORT, out_buf, in_buf, BUF_LEN);
         
         // sleep for a little bit of time.
         sleep_ms(1000);
-    }
+    // }
+
+    printf("Buffer finished transferring");
+    
 #endif
+
+    return 0;
 }
