@@ -7,6 +7,7 @@ if (TARGET tinyusb_device)
     target_link_libraries(SPI_test 
         pico_stdlib
         hardware_spi
+        hardware_timer
     )
 
     # create map/bin/hex file etc.
