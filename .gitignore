@@ -9,5 +9,5 @@ a.out
 .lgd-nfy0
 data0.bin
 data1.bin
-receiver/SPI_isr
+master/SPI_isr
 data

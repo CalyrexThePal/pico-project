@@ -5,13 +5,13 @@ int main() {
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
 
-	int counter = 0;
+    int counter = 0;
 
     while (true) {
         gpio_put(LED_PIN, 1);
         sleep_ms(500);
         gpio_put(LED_PIN, 0);
         sleep_ms(5000);
-	    counter = counter+1;
+        counter = counter+1;
     }
 }

@@ -1,7 +1,11 @@
 /*
     About:
         This is a receiver program on Rasperry Pi 5. This program uses GPIO's as interrupt service
-    and receives data as the master, and then essentially store the data received to bin file
+    and receives data as the master, and then essentially store the data received to bin file. 
+    Be really CAREFUL on the wiring, make sure that 
+        - SPI0 is triggered by GPIO27, 
+        - SPI1 is triggered by GPIO 22, 
+    wrong wiring will result in deadlock.
 
     Compilation: 
         gcc -o SPI_isr SPI_isr.c -l wiringPi
@@ -21,7 +25,7 @@
 #define SPI1 "/dev/spidev1.0"
 
 // Define the buffer size
-#define BUFF_LEN 20005
+#define BUFF_LEN 100005
 
 // Define the clock frequency
 #define CLOCK_FREQ 25000000
@@ -57,7 +61,7 @@ void gpio_callback0(void) {
     }
 
     // Set the SPI mode and clock speed
-    uint8_t mode = 0;
+    uint8_t mode = SPI_MODE_0;
     uint32_t speed = CLOCK_FREQ;
     if (ioctl(spi_fd, SPI_IOC_WR_MODE, &mode) < 0) {
         perror("Error setting SPI mode");
@@ -72,7 +76,7 @@ void gpio_callback0(void) {
 
     // Create a filename based on the current time
     char filename[50];
-    sprintf(filename, "%s/data0%d.bin", DATA_FOLDER, millis());
+    sprintf(filename, "%s/data%d.bin", DATA_FOLDER, millis());
 
     // Open the binary file
     FILE *bin_file = fopen(filename, "wb");
@@ -127,7 +131,7 @@ void gpio_callback1(void) {
     }
 
     // Set the SPI mode and clock speed
-    uint8_t mode = 0;
+    uint8_t mode = SPI_MODE_0;
     uint32_t speed = CLOCK_FREQ;
     if (ioctl(spi_fd, SPI_IOC_WR_MODE, &mode) < 0) {
         perror("Error setting SPI mode");
@@ -142,7 +146,7 @@ void gpio_callback1(void) {
 
     // Create a filename based on the current time
     char filename[50];
-    sprintf(filename, "%s/data1%d.bin", DATA_FOLDER, millis());
+    sprintf(filename, "%s/data%d.bin", DATA_FOLDER, millis());
 
     // Open the binary file
     FILE *bin_file = fopen(filename, "wb");

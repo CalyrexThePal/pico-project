@@ -21,8 +21,8 @@
 /*
     SPI configs:
 */
-#define SPI_PORT            spi0
-#define CLOCK_FREQUENCY     25000000
+#define SPI_PORT                spi0
+#define SPI_CLOCK_FREQUENCY     25000000 // clock speed for SPI channel
 
 #define TRANSFER_PIN        4
 #define SENDER_PIN 8        // GPIO-8 - pin used to send flag signal for unstalling main
@@ -38,8 +38,8 @@
 #define ADC_CHANNEL 0       // ADC channels, pick from 0-3 (4 is reserved for temp. sensor)
 
 // choose buffer size 
-#define SAMPLE_BUFFER_SIZE 20000
-#define BUFFER_THRESHOLD 19000
+#define SAMPLE_BUFFER_SIZE 100000
+#define BUFFER_THRESHOLD 99000
 
 // USER EDIT (OPTIONAL)
 #define Fs 50000.0          // Sample rate (Hz) (must not goes higer than 75 kSPS)
@@ -48,7 +48,7 @@
 #define MACHINES_EMPLOYED 2 // how many pico we are using
 
 // ---------------- Preprocessor variable ----------------
-// #define MSG
+#define MSG
 // #define RECORD_TIME
 
 // ------------------- Buffer Config ---------------------
@@ -72,16 +72,7 @@ volatile bool lock = true;
 const float conversion_factor = 3.3f/(1<<12); 
 
 // *************************** Program Starts ***************************
-
-/*
-    Callback function to unlock the stalling flag before reading
-*/
-void unlock_trigger_callback(uint gpio, uint32_t events) {
-    // temporarilly disable the irq service for receiver pin
-    gpio_set_irq_enabled(RECEIVER_PIN, GPIO_IRQ_EDGE_RISE, false);  
-    lock = false;   // unlock
-}
-
+// helper function
 void printbuf(volatile uint16_t buf[], size_t len) {
     size_t i;
     for (i = 0; i < len; ++i) {
@@ -98,7 +89,15 @@ void printbuf(volatile uint16_t buf[], size_t len) {
 }
 
 /*
-    Function:
+    Description: 
+    Callback function to unlock the stalling flag before reading stage
+*/
+void __not_in_flash_func(unlock_trigger_callback)(uint gpio, uint32_t events) { 
+    lock = false;   // unlock
+}
+
+/*
+    Description:
         Callback function for the interrupt that enables the ADC sampling, 
     send pulse signal if buffer threshold is reached
 
@@ -111,7 +110,7 @@ void printbuf(volatile uint16_t buf[], size_t len) {
     Return:
         NULL
 */
-void ADC_trigger_callback(uint gpio, uint32_t events) {
+void __not_in_flash_func(ADC_trigger_callback)(uint gpio, uint32_t events) {
 
     if (sample_index < SAMPLE_BUFFER_SIZE) {
         sample_buffer[sample_index] = adc_read();   // single ADC sample acquire
@@ -145,7 +144,6 @@ void ADC_trigger_callback(uint gpio, uint32_t events) {
     }
 }
 
-
 int clear_buffer(volatile uint16_t* data){
     // clear the sample buffer
     for (int i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
@@ -175,7 +173,7 @@ int main() {
     adc_init();
     adc_gpio_init(ADC_PIN);
     adc_select_input(ADC_CHANNEL);
-    adc_set_clkdiv(ADCCLK/Fs); // adjust the sampling rate
+    // adc_set_clkdiv(ADCCLK/Fs); // adjust the sampling rate
 
 #if !defined(spi_default) || \
         !defined(PICO_DEFAULT_SPI_SCK_PIN) || \
@@ -186,7 +184,7 @@ int main() {
         puts("Default SPI pins were not defined");
 #endif
 
-    spi_init(SPI_PORT, CLOCK_FREQUENCY);
+    spi_init(SPI_PORT, SPI_CLOCK_FREQUENCY);
     spi_set_slave(SPI_PORT, true); // Set SPI0 to slave mode
     spi_set_format(SPI_PORT, 16, 0, 0, 0);
     gpio_set_function(PICO_DEFAULT_SPI_RX_PIN, GPIO_FUNC_SPI);
@@ -202,7 +200,7 @@ int main() {
         // *************************************************
         // ------------- Stalling Stage Starts -------------
         // -------------------------------------------------
-        // let the first main skips the stalling stage
+        // let the first state skips the stalling stage
         if (machine_state >= 1) {
 #ifdef MSG
             printf("Machine state %d: stalling! \n", machine_state);
@@ -224,14 +222,13 @@ int main() {
         // ------------- Stalling Stage Exited -------------
         // *************************************************
     
-    
+#ifdef MSG 
+        printf("Machine state %d: stalling exited (skipped), now starts ADC-capturing! \n", machine_state);
+#endif
 
         // *************************************************
         // ---------------- ADC Read Starts ----------------
         // -------------------------------------------------
-#ifdef MSG 
-        printf("Machine state %d: stalling exited (skipped), now starts ADC-capturing! \n", machine_state);
-#endif
         gpio_set_dir(ADC_PULSE_PIN, GPIO_IN);
         gpio_pull_up(ADC_PULSE_PIN);
 
@@ -259,25 +256,18 @@ int main() {
 
         // generate signal sending to masterboard
         gpio_put(TRANSFER_PIN, 1);  // set GPIO pin HIGH
-        sleep_ms_low_level(100);
+        sleep_us_low_level(100);
         gpio_put(TRANSFER_PIN, 0);  // set GPIO pin LOW
         
         gpio_set_dir(TRANSFER_PIN, GPIO_IN); // impedence high
 
-        // Baudrate checker:
-        // printf("The baudrate is at: %u Hz \n", spi_get_baudrate(SPI_PORT));
-
+        int t1 = time_us_32();
         // write the output buffer to MOSI, and at the same time read from MISO.
         if(spi_write16_blocking(SPI_PORT, (const uint16_t*)sample_buffer, SAMPLE_BUFFER_SIZE) 
             != SAMPLE_BUFFER_SIZE){
-#ifdef MSG
             printf("Buffer transfer incomplete\n");
-#endif
         }
-        
-#ifdef MSG        
-        printf("Bytes written: %d\n", bytes_written);
-#endif
+        printf("SPI TTK: %d ms\n", (time_us_32() - t1)/1000);
 
         // sleep_ms_low_level(2000);
         // -------------------------------------------------
@@ -288,21 +278,30 @@ int main() {
         printf("Machine state %d: transferring finished , now clearing the buffer! \n", machine_state);
 #endif
 
+        // *************************************************
+        // ------------------ State Reset ------------------
+        // -------------------------------------------------
         // clear the BUFFER and reinitialize the counter
         if(clear_buffer(sample_buffer)){
             printf("Error: Buffer cannot be clear. \n");
             return 1;
         }
+        
         // reset the sampling index and flags
         sample_index = 0;
         sampling_done = false;
         
+        lock = true;    // lock up the main, re-entring stalling stage
+        // -------------------------------------------------
+        // ---------------- Reset Completed ----------------
+        // *************************************************
+
 #ifdef MSG
         printf("Machine state %d: state reset completed.. \n\n\n", machine_state);
 #endif
-    
-        machine_state += MACHINES_EMPLOYED; // increment the machine states for debug
-        lock = true;    // lock up the main, re-entring stalling stage
+
+        // increment the machine states for debug
+        machine_state += MACHINES_EMPLOYED; 
     }
 
     return 0;

@@ -6,7 +6,7 @@
 
 #define SPI_PORT                spi0
 #define TRANSFER_PIN            4
-#define BUF_LEN                 20000  // buffer size: 12288
+#define BUF_LEN                 100005
 #define CLOCK_FREQUENCY         25000000 
 
 // helper function to print buffer
@@ -63,11 +63,11 @@ int main() {
 
     uint16_t out_buf[BUF_LEN], in_buf[BUF_LEN];
 
-    printf("The baudrate is at: %u Hz\n", spi_get_baudrate(SPI_PORT));
+    // printf("The baudrate is at: %u Hz\n", spi_get_baudrate(SPI_PORT));
 
     // uint16_t b16_num = 0;
     // initialize output buffer
-    for (uint16_t i = 0; i < BUF_LEN; i++) {
+    for (size_t i = 0; i < BUF_LEN; i++) {
         out_buf[i] = 641;
     }
 
@@ -78,18 +78,18 @@ int main() {
     for (size_t i = 0; ; ++i) {
         // generate signal sending to masterboard
         gpio_put(TRANSFER_PIN, 1);  // set GPIO pin HIGH
-        sleep_ms_low_level(100);
+        sleep_us_low_level(100);
         gpio_put(TRANSFER_PIN, 0);  // set GPIO pin LOW
 
-        printf("Starts stransferrring\n");
+        int t1 = time_us_32();
 
         // write the output buffer to MOSI, and at the same time read from MISO.
         int bytes_written = spi_write16_blocking(SPI_PORT, out_buf, BUF_LEN);
 
-        printf("Bytes written: %d\n", bytes_written);
+        printf("SPI TTK: %d ms\n", (time_us_32() - t1)/1000);
         
         // sleep for a little bit of time.
-        sleep_ms_low_level(5000);
+        sleep_ms_low_level(3000);
     }
 
     printf("Buffer finished transferring\n");
