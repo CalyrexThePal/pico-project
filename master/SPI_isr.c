@@ -1,7 +1,7 @@
 /*
     About:
         This is a receiver program on Rasperry Pi 5. This program uses GPIO's as interrupt service
-    and receives data as the master, and then essentially store the data received to bin file. 
+    and receives data as the master, and then save the received data into binary files. 
     Be really CAREFUL on the wiring, make sure that 
         - SPI0 is triggered by GPIO27, 
         - SPI1 is triggered by GPIO 22, 
@@ -25,10 +25,10 @@
 #define SPI1 "/dev/spidev1.0"
 
 // Define the buffer size
-#define BUFF_LEN 100005
+#define BUFF_LEN 12500
 
 // Define the clock frequency
-#define CLOCK_FREQ 25000000
+#define CLOCK_FREQ 5000000
 
 // Define the data folder
 #define DATA_FOLDER "data"
@@ -51,7 +51,7 @@ void create_data_folder() {
 void gpio_callback0(void) {
 
     printf("Interrupt Raised from pico A (GPIO %d)\n", GPIO_PIN0);
-    delayMicroseconds(500); // this is really important, DON'T delete
+    delayMicroseconds(100); // this is really important, DON'T delete
 
     // Read data from SPI device 0
     int spi_fd = open(SPI0, O_RDWR);
@@ -121,7 +121,7 @@ void gpio_callback0(void) {
 void gpio_callback1(void) {
 
     printf("Interrupt Raised from pico B (GPIO %d)\n", GPIO_PIN1);
-    delayMicroseconds(500);
+    delayMicroseconds(100);
 
     // Read data from SPI device 1
     int spi_fd = open(SPI1, O_RDWR);

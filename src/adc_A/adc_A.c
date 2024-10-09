@@ -22,9 +22,9 @@
     SPI configs:
 */
 #define SPI_PORT                spi0
-#define SPI_CLOCK_FREQUENCY     25000000 // clock speed for SPI channel
+#define SPI_CLOCK_FREQUENCY     5000000 // clock speed for SPI channel
 
-#define TRANSFER_PIN        4
+#define TRANSFER_PIN 4      // GPIO-4 - pin used to signal transfer status
 #define SENDER_PIN 8        // GPIO-8 - pin used to send flag signal for unstalling main
 #define RECEIVER_PIN 9      // GPIO-9 - pin used to receive flag signal for unstalling main
 
@@ -38,17 +38,17 @@
 #define ADC_CHANNEL 0       // ADC channels, pick from 0-3 (4 is reserved for temp. sensor)
 
 // choose buffer size 
-#define SAMPLE_BUFFER_SIZE 100000
-#define BUFFER_THRESHOLD 99000
+#define SAMPLE_BUFFER_SIZE 12500
+#define BUFFER_THRESHOLD 12500
 
 // USER EDIT (OPTIONAL)
-#define Fs 50000.0          // Sample rate (Hz) (must not goes higer than 75 kSPS)
+#define Fs 250000.0          // Sample rate (Hz) (must not goes higer than 75 kSPS)
 #define ADCCLK 48000000.0   // ADC clock rate (unmutable!)
 
 #define MACHINES_EMPLOYED 2 // how many pico we are using
 
 // ---------------- Preprocessor variable ----------------
-#define MSG
+// #define MSG
 // #define RECORD_TIME
 
 // ------------------- Buffer Config ---------------------
@@ -72,22 +72,6 @@ volatile bool lock = false;
 const float conversion_factor = 3.3f/(1<<12); 
 
 // *************************** Program Starts ***************************
-// helper function
-void printbuf(volatile uint16_t buf[], size_t len) {
-    size_t i;
-    for (i = 0; i < len; ++i) {
-        if (i % 16 == 15)
-            printf("%d\n", buf[i]);
-        else
-            printf("%d ", buf[i]);
-    }
-
-    // append trailing newline if there isn't one
-    if (i % 16) {
-        putchar('\n');
-    }
-}
-
 /*
     Description: 
         Callback function to unlock the stalling flag before reading stage
@@ -114,7 +98,6 @@ void __not_in_flash_func(ADC_trigger_callback)(uint gpio, uint32_t events) {
 
     if (sample_index < SAMPLE_BUFFER_SIZE) {
         sample_buffer[sample_index] = adc_read();   // single ADC sample acquire
-        // printf("Analog value read\n");
 
 #ifdef RECORD_TIME
         timestamp[sample_index] = time_us_32(); // get timestamp in microsecond
@@ -130,7 +113,7 @@ void __not_in_flash_func(ADC_trigger_callback)(uint gpio, uint32_t events) {
 
             // generate signal sending to machine 2
             gpio_put(SENDER_PIN, 1);  // set GPIO pin HIGH
-            sleep_ms_low_level(100);
+            sleep_us_low_level(50);
             gpio_put(SENDER_PIN, 0);  // set GPIO pin LOW
 
             // temporarily disable gpio
@@ -233,14 +216,14 @@ int main() {
         gpio_pull_up(ADC_PULSE_PIN);
 
         // enabled the IRS
-        gpio_set_irq_enabled_with_callback(ADC_PULSE_PIN, GPIO_IRQ_EDGE_RISE, true, &ADC_trigger_callback);
+        gpio_set_irq_enabled_with_callback(ADC_PULSE_PIN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &ADC_trigger_callback);
 
         while (!sampling_done) {
             tight_loop_contents();
         }
 
         // disabled the IRS after ADC values is finished reading
-        gpio_set_irq_enabled(ADC_PULSE_PIN, GPIO_IRQ_EDGE_RISE, false);
+        gpio_set_irq_enabled(ADC_PULSE_PIN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         // -------------------------------------------------
         // --------------- ADC Read Complete ---------------
         // *************************************************
@@ -256,7 +239,7 @@ int main() {
 
         // generate signal sending to masterboard
         gpio_put(TRANSFER_PIN, 1);  // set GPIO pin HIGH
-        sleep_us_low_level(100);
+        sleep_us_low_level(50);
         gpio_put(TRANSFER_PIN, 0);  // set GPIO pin LOW
         
         gpio_set_dir(TRANSFER_PIN, GPIO_IN); // impedence high
@@ -267,9 +250,8 @@ int main() {
             != SAMPLE_BUFFER_SIZE){
             printf("Buffer transfer incomplete\n");
         }
-        printf("SPI TTK: %d ms\n", (time_us_32() - t1)/1000);
 
-        // sleep_ms_low_level(2000);
+        printf("SPI TTK: %d ms\n", (time_us_32() - t1)/1000);
         // -------------------------------------------------
         // ------------- SPI Transferring Ends -------------
         // *************************************************
