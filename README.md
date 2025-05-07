@@ -11,6 +11,7 @@ To build the repo:
 mkdir build
 cd build
 export PICO_SDK_PATH=../../pico-sdk
+cmake ..
 make -j4
 ```
 Inside the build folder, there should be a src folder created that contains all the binary executable, just load the executable to raspberry pi pico 
